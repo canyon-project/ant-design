@@ -54,11 +54,17 @@ jobs:
           pattern: coverage-artifacts-*
           merge-multiple: true
           path: persist-coverage
+
       - name: Merge Code Coverage
         run: |
+          # 创建 coverage 目录（避免 nyc report 报错）
+          mkdir -p coverage
+          # 合并覆盖率文件到 coverage/coverage-final.json
           utx nyc merge persist-coverage/ coverage/coverage-final.json
+          # 生成文本报告（可选，用于日志查看）
           utx nyc report --reporter text -t coverage --report-dir coverage
-          rm -rf persist-coverage
+          # 保留 persist-coverage 目录（或直接用合并后的 coverage/coverage-final.json 上传）
+          # 注意：不再删除 persist-coverage，或直接用合并后的文件路径
 
       - name: Install Canyon CLI
         run: npm i -g @canyonjs/cli
@@ -69,13 +75,17 @@ jobs:
       - name: Upload E2E coverage to Canyon
         env:
           CANYON_DSN: https://app.canyonjs.io/coverage/client
-        run: >
-          utx nyc merge persist-coverage/ .canyon_output/coverage-final.json
-          canyon upload
-          --dsn=$CANYON_DSN
-          --repo_id=${{ github.repository_id }}
-          --instrument_cwd=${{ github.workspace }}
-          --sha=${{ github.sha }}
-          --branch=${{ github.ref_name }}
-          --provider=gitlab
-          --debug=true
+        run: |
+          # 1. 确保 .canyon_output 目录存在（避免 canyon 上传时目录不存在）
+          mkdir -p .canyon_output
+          # 2. （可选）如果 canyon 需要读取 .canyon_output/coverage-final.json，重新合并一次（或直接复制已合并的文件）
+          cp coverage/coverage-final.json .canyon_output/coverage-final.json
+          # 3. 单独执行 canyon upload（关键：拆分命令，避免参数混在一起）
+          canyon upload \
+            --dsn=$CANYON_DSN \
+            --repo_id=${{ github.repository_id }} \
+            --instrument_cwd=${{ github.workspace }} \
+            --sha=${{ github.sha }} \
+            --branch=${{ github.ref_name }} \
+            --provider=github \  # 修正：GitHub Actions 环境用 github，不是 gitlab
+            --debug=true
