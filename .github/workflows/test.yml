@@ -76,16 +76,6 @@ jobs:
         env:
           CANYON_DSN: https://app.canyonjs.io/coverage/client
         run: |
-          # 1. 确保 .canyon_output 目录存在（避免 canyon 上传时目录不存在）
           mkdir -p .canyon_output
-          # 2. （可选）如果 canyon 需要读取 .canyon_output/coverage-final.json，重新合并一次（或直接复制已合并的文件）
           cp coverage/coverage-final.json .canyon_output/coverage-final.json
-          # 3. 单独执行 canyon upload（关键：拆分命令，避免参数混在一起）
-          canyon upload \
-            --dsn=$CANYON_DSN \
-            --repo_id=${{ github.repository_id }} \
-            --instrument_cwd=${{ github.workspace }} \
-            --sha=${{ github.sha }} \
-            --branch=${{ github.ref_name }} \
-            --provider=github \  # 修正：GitHub Actions 环境用 github，不是 gitlab
-            --debug=true
+          canyon upload --dsn=$CANYON_DSN --repo_id=${{ github.repository_id }} --instrument_cwd=${{ github.workspace }} --sha=${{ github.sha }} --branch=${{ github.ref_name }} --provider=github --debug=true
