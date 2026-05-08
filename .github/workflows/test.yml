@@ -1,17 +1,12 @@
-name: ✅ test coverage
+# Origin Source
+# https://github.com/ant-design/ant-design/blob/79f566b7f8abb1012ef55b0d2793bfdf5595b85d/.github/workflows/test.yml
+name: ✅ test
 
 on:
+  workflow_dispatch:
   push:
-    branches: [master, feature]
-  pull_request:
-    branches: [master, feature]
+    branches: ["main","feat/*"]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
 
 jobs:
   test-react-latest:
@@ -20,12 +15,13 @@ jobs:
       matrix:
         module: [dom]
         shard: [1/2, 2/2]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v6
-      - uses: utooland/setup-utoo@v1
+      - uses: utooland/setup-utoo@3a51006d0b66afcc32d1b9177a4b200b74f4a8cb # v1
       - run: ut
 
+      # dom test
       - name: dom test
         run: ut test -- --maxWorkers=2 --shard=${{matrix.shard}} --coverage
 
@@ -40,42 +36,28 @@ jobs:
           name: coverage-artifacts-${{ matrix.module }}-${{ strategy.job-index }}
           path: persist-coverage/
 
+  ############################ Test Coverage ###########################
   upload-test-coverage:
     name: test-coverage
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: test-react-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: utooland/setup-utoo@v1
+      - uses: utooland/setup-utoo@3a51006d0b66afcc32d1b9177a4b200b74f4a8cb # v1
       - run: ut
 
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           pattern: coverage-artifacts-*
           merge-multiple: true
           path: persist-coverage
-
       - name: Merge Code Coverage
         run: |
-          # 创建 coverage 目录（避免 nyc report 报错）
-          mkdir -p coverage
-          # 合并覆盖率文件到 coverage/coverage-final.json
           utx nyc merge persist-coverage/ coverage/coverage-final.json
-          # 生成文本报告（可选，用于日志查看）
           utx nyc report --reporter text -t coverage --report-dir coverage
-          # 保留 persist-coverage 目录（或直接用合并后的 coverage/coverage-final.json 上传）
-          # 注意：不再删除 persist-coverage，或直接用合并后的文件路径
-
-      - name: Install Canyon CLI
-        run: npm i -g @canyonjs/cli
-
-      - name: Canyon help
-        run: canyon -h
-
-      - name: Upload E2E coverage to Canyon
-        env:
-          CANYON_DSN: https://app.canyonjs.io/coverage/client
-        run: |
-          mkdir -p .canyon_output
-          cp coverage/coverage-final.json .canyon_output/coverage-final.json
-          canyon upload --dsn=$CANYON_DSN --repo_id=${{ github.repository_id }} --instrument_cwd=${{ github.workspace }} --sha=${{ github.sha }} --branch=${{ github.ref_name }} --provider=github --debug=true
+          rm -rf persist-coverage
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        with:
+          # use own token to upload coverage reports
+          token: ${{ secrets.CODECOV_TOKEN }}
